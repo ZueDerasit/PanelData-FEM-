@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>fixed_effects_demo.R</title>
+<style>
+body{margin:0;background:#1e1e1e;color:#d4d4d4;font-family:Consolas,Monaco,monospace}
+header{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;background:#252526;position:sticky;top:0}
+button{background:#0e639c;color:white;border:none;padding:8px 14px;border-radius:6px;cursor:pointer}
+.container{padding:16px}
+table{border-collapse:collapse;width:100%}
+.ln{color:#858585;text-align:right;padding-right:16px;user-select:none;vertical-align:top;width:50px}
+.code{white-space:pre}
+tr:hover{background:#2a2d2e}
+</style>
+</head>
+<body>
+<header>
+<div><strong>fixed_effects_demo.R</strong></div>
+<button onclick="copyCode()">📋 Copy Code</button>
+</header>
+<div class="container">
+<table>
+<tr><td class="ln">1</td><td class="code">#c====================================================================</td></tr>
+<tr><td class="ln">2</td><td class="code"># Panel Data Regression - Fixed Effects Model (FEM) Simulation</td></tr>
+<tr><td class="ln">3</td><td class="code"># =====================================================================</td></tr>
+<tr><td class="ln">4</td><td class="code"># Step 0: Install and load required packages</td></tr>
+<tr><td class="ln">5</td><td class="code">if (!require(&quot;plm&quot;)) install.packages(&quot;plm&quot;)</td></tr>
+<tr><td class="ln">6</td><td class="code">library(plm)</td></tr>
+<tr><td class="ln">7</td><td class="code"></td></tr>
+<tr><td class="ln">8</td><td class="code"># ------------------------------------------------------------------------------------------------------------</td></tr>
+<tr><td class="ln">9</td><td class="code"># 1. SIMULATE PANEL DATA</td></tr>
+<tr><td class="ln">10</td><td class="code"># ------------------------------------------------------------------------------------------------------------</td></tr>
+<tr><td class="ln">11</td><td class="code">set.seed(310)  # For reproducibility</td></tr>
+<tr><td class="ln">12</td><td class="code">N &lt;- 4         # 4 entities (e.g., Airlines: Delta, United, American, US Airways)</td></tr>
+<tr><td class="ln">13</td><td class="code">T &lt;- 15        # 15 time periods (e.g., Years: 1990 to 2004)</td></tr>
+<tr><td class="ln">14</td><td class="code">total_obs &lt;- N * T</td></tr>
+<tr><td class="ln">15</td><td class="code"></td></tr>
+<tr><td class="ln">16</td><td class="code"># Create Entity (i) and Time (t) identifiers</td></tr>
+<tr><td class="ln">17</td><td class="code">firm_id &lt;- factor(rep(1:N, each = T))</td></tr>
+<tr><td class="ln">18</td><td class="code">year &lt;- rep(1990:(1990 + T - 1), times = N)</td></tr>
+<tr><td class="ln">19</td><td class="code"></td></tr>
+<tr><td class="ln">20</td><td class="code"># Define True Entity Fixed Effects (unobserved heterogeneity alpha_i)</td></tr>
+<tr><td class="ln">21</td><td class="code"># Delta = 0 (base), United = -120, American = -80, US Airways = 40</td></tr>
+<tr><td class="ln">22</td><td class="code">true_alpha &lt;- c(0, -120, -80, 40)</td></tr>
+<tr><td class="ln">23</td><td class="code">alpha_i &lt;- rep(true_alpha, each = T)</td></tr>
+<tr><td class="ln">24</td><td class="code"></td></tr>
+<tr><td class="ln">25</td><td class="code"># Generate Explanatory Variable X (Output: Ticket Miles)</td></tr>
+<tr><td class="ln">26</td><td class="code"># Notice that Output is correlated with alpha_i (Well-managed firms produce more output)</td></tr>
+<tr><td class="ln">27</td><td class="code">X_output &lt;- round(runif(total_obs, min = 200, max = 1000) + 0.5 * alpha_i)</td></tr>
+<tr><td class="ln">28</td><td class="code"># Generate Idiosyncratic Noise (epsilon_it)</td></tr>
+<tr><td class="ln">29</td><td class="code">epsilon &lt;- rnorm(total_obs, mean = 0, sd = 15)</td></tr>
+<tr><td class="ln">30</td><td class="code"></td></tr>
+<tr><td class="ln">31</td><td class="code"># Generate Dependent Variable Y (Total Cost)</td></tr>
+<tr><td class="ln">32</td><td class="code"># True Model: Cost = 50 + 0.10 * Output + alpha_i + epsilon_it</td></tr>
+<tr><td class="ln">33</td><td class="code">true_beta2 &lt;- 0.10</td></tr>
+<tr><td class="ln">34</td><td class="code">Y_cost &lt;- 50 + true_beta2 * X_output + alpha_i + epsilon</td></tr>
+<tr><td class="ln">35</td><td class="code"></td></tr>
+<tr><td class="ln">36</td><td class="code"># Assemble into a clean data frame</td></tr>
+<tr><td class="ln">37</td><td class="code">panel_data &lt;- data.frame(</td></tr>
+<tr><td class="ln">38</td><td class="code">  firm_id = firm_id,</td></tr>
+<tr><td class="ln">39</td><td class="code">  year = year,</td></tr>
+<tr><td class="ln">40</td><td class="code">  Cost = Y_cost,</td></tr>
+<tr><td class="ln">41</td><td class="code">  Output = X_output</td></tr>
+<tr><td class="ln">42</td><td class="code">)</td></tr>
+<tr><td class="ln">43</td><td class="code"></td></tr>
+<tr><td class="ln">44</td><td class="code">head(panel_data, 10)  # Preview data</td></tr>
+<tr><td class="ln">45</td><td class="code"></td></tr>
+<tr><td class="ln">46</td><td class="code"></td></tr>
+<tr><td class="ln">47</td><td class="code"># ------------------------------------------------------------------------------------------------------------</td></tr>
+<tr><td class="ln">48</td><td class="code"># 2. ESTIMATION METHOD 1: POOLED OLS (Flawed Benchmark)</td></tr>
+<tr><td class="ln">49</td><td class="code"># ------------------------------------------------------------------------------------------------------------</td></tr>
+<tr><td class="ln">50</td><td class="code">pooled_ols &lt;- lm(Cost ~ Output, data = panel_data)</td></tr>
+<tr><td class="ln">51</td><td class="code">cat(&quot;\n--- POOLED OLS RESULTS ---\n&quot;)</td></tr>
+<tr><td class="ln">52</td><td class="code">summary(pooled_ols)</td></tr>
+<tr><td class="ln">53</td><td class="code"></td></tr>
+<tr><td class="ln">54</td><td class="code"># ------------------------------------------------------------------------------------------------------------</td></tr>
+<tr><td class="ln">55</td><td class="code"># 3. ESTIMATION METHOD 2: LSDV (Least Squares Dummy Variable)</td></tr>
+<tr><td class="ln">56</td><td class="code"># ------------------------------------------------------------------------------------------------------------</td></tr>
+<tr><td class="ln">57</td><td class="code">lsdv_model &lt;- lm(Cost ~ Output + firm_id, data = panel_data)</td></tr>
+<tr><td class="ln">58</td><td class="code">cat(&quot;\n--- LSDV FIXED EFFECTS RESULTS ---\n&quot;)</td></tr>
+<tr><td class="ln">59</td><td class="code">summary(lsdv_model)</td></tr>
+<tr><td class="ln">60</td><td class="code"></td></tr>
+<tr><td class="ln">61</td><td class="code"># ------------------------------------------------------------------------------------------------------------</td></tr>
+<tr><td class="ln">62</td><td class="code"># 4. ESTIMATION METHOD 3: WITHIN-GROUP ESTIMATOR (Time-Demeaning using plm)</td></tr>
+<tr><td class="ln">63</td><td class="code"># ------------------------------------------------------------------------------------------------------------</td></tr>
+<tr><td class="ln">64</td><td class="code">p_data &lt;- pdata.frame(panel_data, index = c(&quot;firm_id&quot;, &quot;year&quot;))</td></tr>
+<tr><td class="ln">65</td><td class="code">fe_model &lt;- plm(Cost ~ Output, data = p_data, model = &quot;within&quot;)</td></tr>
+<tr><td class="ln">66</td><td class="code">cat(&quot;\n--- WITHIN-GROUP FIXED EFFECTS (plm) RESULTS ---\n&quot;)</td></tr>
+<tr><td class="ln">67</td><td class="code">summary(fe_model)</td></tr>
+<tr><td class="ln">68</td><td class="code"></td></tr>
+<tr><td class="ln">69</td><td class="code">cat(&quot;\nIs LSDV slope identical to Within-Group slope?\n&quot;)</td></tr>
+<tr><td class="ln">70</td><td class="code">cat(&quot;LSDV Slope:&quot;, coef(lsdv_model)[&quot;Output&quot;], &quot;\n&quot;)</td></tr>
+<tr><td class="ln">71</td><td class="code">cat(&quot;WG Slope:  &quot;, coef(fe_model)[&quot;Output&quot;], &quot;\n&quot;)</td></tr>
+<tr><td class="ln">72</td><td class="code"></td></tr>
+<tr><td class="ln">73</td><td class="code"># ------------------------------------------------------------------------------------------------------------</td></tr>
+<tr><td class="ln">74</td><td class="code"># 5. RECOVERING INDIVIDUAL ENTITY INTERCEPTS</td></tr>
+<tr><td class="ln">75</td><td class="code"># ------------------------------------------------------------------------------------------------------------</td></tr>
+<tr><td class="ln">76</td><td class="code">cat(&quot;\n--- RECOVERED FIXED EFFECTS INTERCEPTS (beta_1i) ---\n&quot;)</td></tr>
+<tr><td class="ln">77</td><td class="code">fixed_effects_intercepts &lt;- fixef(fe_model)</td></tr>
+<tr><td class="ln">78</td><td class="code">print(fixed_effects_intercepts)</td></tr>
+<tr><td class="ln">79</td><td class="code"></td></tr>
+<tr><td class="ln">80</td><td class="code"># ------------------------------------------------------------------------------------------------------------</td></tr>
+<tr><td class="ln">81</td><td class="code"># 6. MANUAL TIME-DEMEANING (Hand Calculation Verification)</td></tr>
+<tr><td class="ln">82</td><td class="code"># ------------------------------------------------------------------------------------------------------------</td></tr>
+<tr><td class="ln">83</td><td class="code">panel_data$mean_Cost &lt;- ave(panel_data$Cost, panel_data$firm_id, FUN = mean)</td></tr>
+<tr><td class="ln">84</td><td class="code">panel_data$mean_Output &lt;- ave(panel_data$Output, panel_data$firm_id, FUN = mean)</td></tr>
+<tr><td class="ln">85</td><td class="code">panel_data$demeaned_Cost &lt;- panel_data$Cost - panel_data$mean_Cost</td></tr>
+<tr><td class="ln">86</td><td class="code">panel_data$demeaned_Output &lt;- panel_data$Output - panel_data$mean_Output</td></tr>
+<tr><td class="ln">87</td><td class="code"></td></tr>
+<tr><td class="ln">88</td><td class="code">cat(&quot;\nSum of demeaned Cost for Firm 1:&quot;, sum(panel_data$demeaned_Cost[panel_data$firm_id == 1]), &quot;\n&quot;)</td></tr>
+<tr><td class="ln">89</td><td class="code"></td></tr>
+<tr><td class="ln">90</td><td class="code">manual_wg &lt;- lm(demeaned_Cost ~ demeaned_Output - 1, data = panel_data)</td></tr>
+<tr><td class="ln">91</td><td class="code">cat(&quot;\n--- MANUAL TIME-DEMEANED OLS SLOPE ---\n&quot;)</td></tr>
+<tr><td class="ln">92</td><td class="code">coef(manual_wg)</td></tr>
+<tr><td class="ln">93</td><td class="code"></td></tr>
+<tr><td class="ln">94</td><td class="code"># ------------------------------------------------------------------------------------------------------------</td></tr>
+<tr><td class="ln">95</td><td class="code"># 7. DIAGNOSTIC HYPOTHESIS TESTING</td></tr>
+<tr><td class="ln">96</td><td class="code"># ------------------------------------------------------------------------------------------------------------</td></tr>
+<tr><td class="ln">97</td><td class="code">cat(&quot;\n--- REDUNDANT FIXED EFFECTS TEST (pFtest) ---\n&quot;)</td></tr>
+<tr><td class="ln">98</td><td class="code">pFtest(fe_model, pooled_ols)</td></tr>
+<tr><td class="ln">99</td><td class="code"></td></tr>
+<tr><td class="ln">100</td><td class="code">re_model &lt;- plm(Cost ~ Output, data = p_data, model = &quot;random&quot;)</td></tr>
+<tr><td class="ln">101</td><td class="code"></td></tr>
+<tr><td class="ln">102</td><td class="code">cat(&quot;\n--- HAUSMAN SPECIFICATION TEST (phtest) ---\n&quot;)</td></tr>
+<tr><td class="ln">103</td><td class="code">phtest(fe_model, re_model)</td></tr>
+</table>
+</div>
+<script>
+const code=`#c====================================================================
+# Panel Data Regression - Fixed Effects Model (FEM) Simulation
+# =====================================================================
+# Step 0: Install and load required packages
+if (!require("plm")) install.packages("plm")
+library(plm)
+
+# ------------------------------------------------------------------------------------------------------------
+# 1. SIMULATE PANEL DATA
+# ------------------------------------------------------------------------------------------------------------
+set.seed(310)  # For reproducibility
+N <- 4         # 4 entities (e.g., Airlines: Delta, United, American, US Airways)
+T <- 15        # 15 time periods (e.g., Years: 1990 to 2004)
+total_obs <- N * T
+
+# Create Entity (i) and Time (t) identifiers
+firm_id <- factor(rep(1:N, each = T))
+year <- rep(1990:(1990 + T - 1), times = N)
+
+# Define True Entity Fixed Effects (unobserved heterogeneity alpha_i)
+# Delta = 0 (base), United = -120, American = -80, US Airways = 40
+true_alpha <- c(0, -120, -80, 40)
+alpha_i <- rep(true_alpha, each = T)
+
+# Generate Explanatory Variable X (Output: Ticket Miles)
+# Notice that Output is correlated with alpha_i (Well-managed firms produce more output)
+X_output <- round(runif(total_obs, min = 200, max = 1000) + 0.5 * alpha_i)
+# Generate Idiosyncratic Noise (epsilon_it)
+epsilon <- rnorm(total_obs, mean = 0, sd = 15)
+
+# Generate Dependent Variable Y (Total Cost)
+# True Model: Cost = 50 + 0.10 * Output + alpha_i + epsilon_it
+true_beta2 <- 0.10
+Y_cost <- 50 + true_beta2 * X_output + alpha_i + epsilon
+
+# Assemble into a clean data frame
+panel_data <- data.frame(
+  firm_id = firm_id,
+  year = year,
+  Cost = Y_cost,
+  Output = X_output
+)
+
+head(panel_data, 10)  # Preview data
+
+
+# ------------------------------------------------------------------------------------------------------------
+# 2. ESTIMATION METHOD 1: POOLED OLS (Flawed Benchmark)
+# ------------------------------------------------------------------------------------------------------------
+pooled_ols <- lm(Cost ~ Output, data = panel_data)
+cat("\\n--- POOLED OLS RESULTS ---\\n")
+summary(pooled_ols)
+
+# ------------------------------------------------------------------------------------------------------------
+# 3. ESTIMATION METHOD 2: LSDV (Least Squares Dummy Variable)
+# ------------------------------------------------------------------------------------------------------------
+lsdv_model <- lm(Cost ~ Output + firm_id, data = panel_data)
+cat("\\n--- LSDV FIXED EFFECTS RESULTS ---\\n")
+summary(lsdv_model)
+
+# ------------------------------------------------------------------------------------------------------------
+# 4. ESTIMATION METHOD 3: WITHIN-GROUP ESTIMATOR (Time-Demeaning using plm)
+# ------------------------------------------------------------------------------------------------------------
+p_data <- pdata.frame(panel_data, index = c("firm_id", "year"))
+fe_model <- plm(Cost ~ Output, data = p_data, model = "within")
+cat("\\n--- WITHIN-GROUP FIXED EFFECTS (plm) RESULTS ---\\n")
+summary(fe_model)
+
+cat("\\nIs LSDV slope identical to Within-Group slope?\\n")
+cat("LSDV Slope:", coef(lsdv_model)["Output"], "\\n")
+cat("WG Slope:  ", coef(fe_model)["Output"], "\\n")
+
+# ------------------------------------------------------------------------------------------------------------
+# 5. RECOVERING INDIVIDUAL ENTITY INTERCEPTS
+# ------------------------------------------------------------------------------------------------------------
+cat("\\n--- RECOVERED FIXED EFFECTS INTERCEPTS (beta_1i) ---\\n")
+fixed_effects_intercepts <- fixef(fe_model)
+print(fixed_effects_intercepts)
+
+# ------------------------------------------------------------------------------------------------------------
+# 6. MANUAL TIME-DEMEANING (Hand Calculation Verification)
+# ------------------------------------------------------------------------------------------------------------
+panel_data$mean_Cost <- ave(panel_data$Cost, panel_data$firm_id, FUN = mean)
+panel_data$mean_Output <- ave(panel_data$Output, panel_data$firm_id, FUN = mean)
+panel_data$demeaned_Cost <- panel_data$Cost - panel_data$mean_Cost
+panel_data$demeaned_Output <- panel_data$Output - panel_data$mean_Output
+
+cat("\\nSum of demeaned Cost for Firm 1:", sum(panel_data$demeaned_Cost[panel_data$firm_id == 1]), "\\n")
+
+manual_wg <- lm(demeaned_Cost ~ demeaned_Output - 1, data = panel_data)
+cat("\\n--- MANUAL TIME-DEMEANED OLS SLOPE ---\\n")
+coef(manual_wg)
+
+# ------------------------------------------------------------------------------------------------------------
+# 7. DIAGNOSTIC HYPOTHESIS TESTING
+# ------------------------------------------------------------------------------------------------------------
+cat("\\n--- REDUNDANT FIXED EFFECTS TEST (pFtest) ---\\n")
+pFtest(fe_model, pooled_ols)
+
+re_model <- plm(Cost ~ Output, data = p_data, model = "random")
+
+cat("\\n--- HAUSMAN SPECIFICATION TEST (phtest) ---\\n")
+phtest(fe_model, re_model)
+`;
+function copyCode(){
+navigator.clipboard.writeText(code);
+alert("R code copied!");
+}
+</script>
+</body>
+</html>
