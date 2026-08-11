@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fixed Effects Challenge</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f4f6f8;color:#202124;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:900px;margin:auto;padding:24px 16px 50px}.hero{background:#1e293b;color:white;border-radius:18px;padding:28px;margin-bottom:18px}
+.hero h1{margin:0 0 8px;font-size:clamp(26px,5vw,38px)}.hero p{margin:0;color:#e2e8f0;line-height:1.6}
+.card{background:white;border:1px solid #dfe3e8;border-radius:16px;padding:24px;box-shadow:0 4px 16px rgba(0,0,0,.05)}
+.top{display:flex;justify-content:space-between;gap:12px;margin-bottom:14px}.meta{color:#687078;font-size:14px}
+.progress{height:8px;background:#e5e7eb;border-radius:99px;overflow:hidden;margin-bottom:24px}.bar{height:100%;background:#2563eb;width:0;transition:.3s}
+h2{font-size:22px;line-height:1.45}.option{width:100%;text-align:left;padding:15px;margin:8px 0;border:1px solid #dfe3e8;background:white;border-radius:10px;cursor:pointer;font-size:16px}
+.option:hover{border-color:#2563eb;background:#f8fbff}.option.correct{border-color:#15803d;background:#ecfdf3}.option.wrong{border-color:#b91c1c;background:#fef2f2}.option:disabled{cursor:default}
+.feedback{display:none;margin-top:18px;padding:15px;border-radius:10px;line-height:1.55}.feedback.correct{display:block;color:#15803d;background:#ecfdf3}.feedback.wrong{display:block;color:#b91c1c;background:#fef2f2}
+.actions{display:flex;justify-content:flex-end;margin-top:20px}button.action{border:0;border-radius:9px;padding:11px 18px;font-weight:600;cursor:pointer;background:#2563eb;color:white}.hidden{display:none!important}
+.score{text-align:center;padding:32px 20px}.big{font-size:52px;font-weight:800;margin:10px 0}
+.small{font-size:13px;color:#687078}
+</style></head><body><div class="wrap">
+<section class="hero"><h1>🚀 Fixed Effects Challenge</h1>
+<p>Test your understanding of key concepts, estimation methods, and assumptions of the Fixed Effects Model.</p></section>
+<section class="card" id="quiz"><div class="top"><strong id="num"></strong><span class="meta">Total: 7 points</span></div>
+<div class="progress"><div class="bar" id="bar"></div></div><div id="area"></div>
+<div class="actions"><button class="action hidden" id="next">Next Question →</button></div></section>
+<section class="card score hidden" id="result"><div style="font-size:42px">🎉</div><h2>Quiz Complete!</h2>
+<div class="big" id="score"></div><p id="msg"></p><button class="action" onclick="restart()">Try Again</button></section>
+</div>
+<script>
+const qs=[["What is the main purpose of using a Fixed Effects Model?", 1, ["To increase the sample size", "To control for unobserved individual-specific characteristics that are constant over time", "To remove all independent variables", "To estimate only time effects"], 1, "Correct! The Fixed Effects Model controls for unobserved individual-specific characteristics that do not change over time.", "Not quite. Fixed Effects controls for unobserved individual-specific characteristics that are constant over time."], ["What does the within transformation do in the Fixed Effects Model?", 1, ["It removes the individual-specific time-invariant effects", "It removes all independent variables", "It converts panel data into cross-sectional data", "It estimates a Random Effects model"], 0, "Correct! The within transformation subtracts each entity's time average and removes its time-invariant individual effect.", "Not quite. The within transformation removes the individual-specific time-invariant effect by demeaning the variables within each entity."], ["Which of the following statements about time-invariant independent variables is correct in a Fixed Effects Model?", 1, ["They are always the most important variables in the model", "They can be estimated directly without any problem", "They cannot be separately estimated because they are perfectly collinear with the individual fixed effects", "They are automatically converted into time-varying variables"], 2, "Correct! Time-invariant variables cannot be separately estimated because they are perfectly collinear with the individual fixed effects.", "Not quite. Time-invariant variables cannot be separately estimated in a standard individual Fixed Effects model because of perfect collinearity."], ["Which condition is necessary for the Fixed Effects estimator to be consistent?", 1, ["Strict exogeneity of the regressors", "The individual effects must be uncorrelated with the regressors", "All variables must be time-invariant", "The dependent variable must be normally distributed"], 0, "Correct! Strict exogeneity of the regressors is required for consistency of the Fixed Effects estimator.", "Not quite. Fixed Effects allows the individual effects to be correlated with the regressors, but strict exogeneity is required for consistency."], ["Which of the following statements about the Fixed Effects Model are TRUE?", 3, ["It accounts for omitted variable bias caused by time-invariant factors.", "It is appropriate when the unobserved effect is correlated with the independent variables.", "It allows for the inclusion of time-invariant independent variables like gender or race."], [true, true, false], "Correct! Fixed Effects controls for time-invariant unobserved factors, allows correlation between the individual effect and regressors, but cannot separately estimate time-invariant regressors.", "Not quite. Fixed Effects accounts for time-invariant unobserved factors and is appropriate when the individual effect is correlated with regressors. However, time-invariant variables cannot be separately estimated."]];let n=0,score=0,done=false,tf=[];
+function render(){done=false;tf=[];let q=qs[n];document.getElementById("num").textContent=`Question ${n+1} of ${qs.length}`;
+document.getElementById("bar").style.width=(n/qs.length*100)+"%";document.getElementById("next").classList.add("hidden");
+let a=`<h2>${q[0]} <span class="meta">(${q[1]} point${q[1]>1?"s":""})</span></h2>`;
+if(Array.isArray(q[3])){a+=`<p class="small">Select True or False for each statement.</p>`;q[2].forEach((x,i)=>a+=`<div style="margin:18px 0"><strong>${i+1}.</strong> ${x}<br><button class="option tf" data-i="${i}" data-v="true">True</button><button class="option tf" data-i="${i}" data-v="false">False</button></div>`);a+=`<div id="fb" class="feedback"></div>`}
+else{q[2].forEach((x,i)=>a+=`<button class="option single" data-i="${i}">${String.fromCharCode(65+i)}. ${x}</button>`);a+=`<div id="fb" class="feedback"></div>`}
+document.getElementById("area").innerHTML=a;
+document.querySelectorAll(".single").forEach(b=>b.onclick=()=>single(+b.dataset.i));
+document.querySelectorAll(".tf").forEach(b=>b.onclick=()=>truth(+b.dataset.i,b.dataset.v==="true"));}
+function single(i){if(done)return;done=true;let q=qs[n],bs=document.querySelectorAll(".single");bs.forEach(b=>b.disabled=true);bs[q[3]].classList.add("correct");
+let fb=document.getElementById("fb");if(i===q[3]){score+=q[1];fb.className="feedback correct";fb.innerHTML="✅ <b>Correct!</b> "+q[4]}else{bs[i].classList.add("wrong");fb.className="feedback wrong";fb.innerHTML="❌ <b>Incorrect.</b> "+q[5]}document.getElementById("next").classList.remove("hidden");}
+function truth(i,v){if(tf[i]!==undefined)return;tf[i]=v;document.querySelectorAll(`.tf[data-i="${i}"]`).forEach(b=>b.disabled=true);
+if(tf.filter(x=>x!==undefined).length===3){let q=qs[n],c=0;for(let j=0;j<3;j++)if(tf[j]===q[3][j])c++;
+document.querySelectorAll(".tf").forEach(b=>{let j=+b.dataset.i;if(String(q[3][j])===b.dataset.v)b.classList.add("correct");});
+let fb=document.getElementById("fb");if(c===3){score+=3;fb.className="feedback correct";fb.innerHTML="✅ <b>Correct!</b> "+q[4]}else{fb.className="feedback wrong";fb.innerHTML=`❌ <b>${c} of 3 correct.</b> `+q[5]}document.getElementById("next").classList.remove("hidden");}}
+document.getElementById("next").onclick=()=>{n++;if(n>=qs.length)show();else render()};
+function show(){document.getElementById("quiz").classList.add("hidden");document.getElementById("result").classList.remove("hidden");document.getElementById("score").textContent=score+" / 7";document.getElementById("msg").textContent=score===7?"Excellent! You have a strong understanding of the Fixed Effects Model.":score>=5?"Good job! Review the concepts you missed and try again.":"Keep practising! Review the Fixed Effects concepts and try again.";}
+function restart(){n=0;score=0;document.getElementById("result").classList.add("hidden");document.getElementById("quiz").classList.remove("hidden");render()}render();
+</script></body></html>
